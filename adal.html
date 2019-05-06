@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+	<meta charset="utf-8" />
+	<title>Lists and forms</title>
+	<script src="https://rawgit.com/PokeAPI/pokeapi-js-wrapper/master/dist/index.js"></script>
+	<script src="https://unpkg.com/react@15/dist/react.min.js"></script>
+    <script src="https://unpkg.com/react-dom@15/dist/react-dom.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.24.0/babel.js"></script>
+	<link href="https://fonts.googleapis.com/css?family=Ubuntu" rel="stylesheet">
+
+	<style type="text/css" title="text/css">
+		* { font-family: 'Ubuntu', sans-serif; }
+		body { background: #fae351; text-align: center}
+		.liPoke { text-decoration: none; display: inline-block; margin: 12px; width: 240px; box-shadow: 0 4px 4px 0 rgba(0, 0, 0, 0.1), 0 1px 16px 0 rgba(0, 0, 0, 0.1); border: 1px solid #D4C8AE; }
+		.liTypes { display: inline-block; padding: .3em; font-size: .7em; border-radius: 5px; border: 1px solid #B3A399; color: #B3A399; margin-right: .4em }
+		img { background: #dfdfdf; display: inline-block; position: relative; top: 1em;}
+		.toPokeImg { background: #dfdfdf; text-align: center; }
+		.toPokeId { background: #cecdd2; width: 48px; padding: .3em; font-size: .8em; color: #593620}
+		.toPokeId::before { content: "ID / "; }
+		.toInfo { padding: 18px; background: #ffffff; }
+		h4 { margin: 0 0 .5em}
+		.toScale { transform: scale(3); transform-origin: 0 0 ; }
+		.ulTypes { padding: 0; }
+		div.evol, div.evolSin {padding: 0 .3em; margin: .5em 0; color: #918C88; font-size: 1.1em}
+		div.evol {border-left: 3px solid #482a19; }
+		span.evol {display: block; font-weight: normal; font-size: .7em; color: #B3A399; }
+		.divTotal {width: 800px; display: inline-block; text-align: center; }
+		.ulTotal {padding: 0; text-align: left}
+		input {width: 43.3em; font-size: 1.1em; padding: .3em; display: inline-block; text-align: center;  font-weight: 100}
+		input::placeholder { color: #d4d3c6;  }
+		button {width: 30em; font-size: 1.1em; padding: .3em; display: inline-block; text-align: center; color: #ffffff; font-weight: 100; margin-bottom: 2em; background: #dfdfdf; border-radius: 5.5em;}
+	</style>
+</head>
+<body>
+
+<div id="container"></div>
+
+<script>
+
+	var P = new Pokedex.Pokedex({protocol: 'https'});
+	
+// TO DO: variables globales a objeto de estado
+	
+	var currentPoke = 0;
+	var finalPoke = 24; // Pokes totales 802;
+	var batchRender = 12;
+	var pokeData = [];
+	
+	function getPokeData(currentPoke) {
+	
+// La función getPokeData emplea el Browser-side with auto caching: pokeapi-js-wrapper by Alessandro Pezzé,
+// librería recomendada en la página https://pokeapi.co/docs/v2.html/#resource-lists-section.
+// La función getPokeData encadena funciones para obtener sucesivamente los datos
+// correspondientes a cada pokemon, que guarda en el array pokeData.
+	
+		if (currentPoke < finalPoke) {
+			currentPoke++;
+			P.getPokemonByName(currentPoke) 
+			.then(function(response) {
+				let pImageURL = response.sprites.front_default;
+				let pName = response.name;				
+				let pTypes = response.types;
+				let pTypesName = [];
+				for (var key in pTypes) {
+					pTypesName[key] = pTypes[key].type.name.toUpperCase();
+ 				}
+				pokeData[currentPoke] = {
+					id: currentPoke,
+					name: pName,
+					types: pTypesName,
+					imageURL: pImageURL,
+					evolution: ''
+					};
+				return pokeData
+			})
+			.then(getEvolutionData(currentPoke))
+			.then(getPokeData(currentPoke))
+			.catch(function(err) {
+			 	console.log(err)
+			 	return
+			});		
+		}
+	}
+
+	function getEvolutionData(currentPoke) {
+	
+// La librería pokeapi-js-wrapper obtiene los datos de especies y evolución con un método diferente al general
+// getEvolutionData utiliza este método y desencadena el renderizado de la pantalla según el rango
+// indicado por la variable batchRender.
+
+		P.getPokemonSpeciesByName(currentPoke)
+		.then(function(response) {
+			if (response.evolves_from_species != null) {
+				pokeData[currentPoke].evolution = response.evolves_from_species.name;
+			}
+			if (currentPoke === finalPoke || currentPoke % batchRender === 0) {
+				renderReact();
+				if (batchRender === 1) {
+				
+// batchRender igual a 1 indica que se pide un solo Pokémon, esto es, una ampliación
+// desde la function handleClick() en la function PokeItem(props)
+
+					var x = document.getElementsByClassName("liPoke");
+			  		console.log(x.length)
+			  		x[0].classList.add("toScale");
+				}
+			}
+			return pokeData
+		});
+	}
+
+	function capitalizeInitial(string) {
+		return string.charAt(0).toUpperCase() + string.slice(1);
+	}
+
+</script>
+
+<script type="text/babel">
+
+class FilterInput extends React.Component {
+
+	constructor(props) {
+		super(props);
+		this.handleFilterTextChange = this.handleFilterTextChange.bind(this);
+	}
+
+	handleFilterTextChange(e) {
+		this.props.onFilterTextChange(e.target.value);
+	}
+	
+	render() {
+		let filterText = this.props.filterText;
+		
+		if (batchRender > 1) {
+		
+		return (
+			<input type = "text"	 
+				placeholder="Filtra pokemons por nombre..."
+				value={this.props.filterText}
+				onChange={this.handleFilterTextChange}
+			/>
+		)
+		
+		} else {
+			return	(<span>	</span>)
+		}
+	}
+}
+
+function Button24More(props) {
+
+// TODO: conservar el número de pokemons mostrado al cambiar de página
+
+	function handle24More() {
+		if (finalPoke < (802 - 24)) {
+			finalPoke += 24; // Pokes totales 802;
+		} else {
+			finalPoke = 802;
+		}
+		getPokeData(0);
+	}
+	
+	if (batchRender > 1 && finalPoke < 802) {
+		if (finalPoke < 24) {
+			return (
+				<div>
+					<button  onClick = {handle24More}>
+						Cargar los pokemons restantes
+					</button>
+				</div>
+			)
+		} else {
+			return (
+				<div>
+					<button  onClick = {handle24More}>
+						Cargar 24 pokemons más
+					</button>
+				</div>
+			)
+		}
+	} else {
+		return null
+	}
+}
+
+function Evolution(props) {
+   if(!props.evol){
+        return (
+	        <div className = "evolSin">
+        		<span className = "evol"><br /></span>
+        		<br />
+			</div>
+		)
+    } else {
+        return (
+	        <div className = "evol">
+        		<span className = "evol">Evoluciona de: </span>
+        		{props.evol}
+			</div>        
+        )
+    }
+}
+
+
+class TypesList extends React.Component {	
+
+	constructor(props) {
+		super(props);
+	}
+
+	render() {
+		var elements = this.props.array.map((item,index) => <li className = "liTypes" key = {index}> {item} </li>);
+		return (<ul className = "ulTypes">{elements}</ul>)
+	}		 
+}
+
+function PokeItem(props) {
+
+	function handleClick() {		
+		if (batchRender === 1) {
+			window.location.assign('ax.html'); 
+		} else {
+	
+// props.id, indica qué ficha se ha de ampliar. Un solo parámetro al final de la URL es suficiente en este caso
+// pero TO DO: indicar el nombre de la query por si hay que pasar más datos entre URLs
+
+			window.location.assign('ax.html?' + props.id);
+		}
+	}
+		
+	return (
+		<li className = "liPoke" onClick = {handleClick} >
+			<div className="toPokeImg">
+				<img src = {props.imageURL} alt = {props.name} />
+				<div className = "toPokeId">
+					{props.id}
+				</div>
+			</div>
+			<div className = "toInfo">
+				<h4>
+					{capitalizeInitial(props.name)}
+				</h4>
+				<TypesList array = {props.types}/>
+				<Evolution evol={props.evolution} />
+			</div>
+		</li>
+	)
+}
+
+class PokeList extends React.Component {	
+
+	render(){
+		const filterText = this.props.filterText;
+
+		var elements = this.props.array.map( (item,index) => {
+			if (item.name.indexOf(filterText) === -1) {
+				return
+			} else {
+				return <PokeItem key = {item.id} name = {item.name} imageURL = {item.imageURL} id = {item.id} types = {item.types} evolution={item.evolution}/>			
+			}
+		})
+
+		return (
+			<ul className = "ulTotal">
+				{elements}
+			</ul>
+			
+		)
+	}
+}
+
+class App extends React.Component {
+
+	constructor(props) {
+		super(props);
+		this.state = {filterText: ''};
+		this.handleFilterTextChange = this.handleFilterTextChange.bind(this);
+	}
+
+	handleFilterTextChange(filterText) {
+		this.setState({filterText: filterText.toLowerCase()});
+	}
+
+	render() {
+		return (
+		<div className = "divTotal" >
+			<FilterInput onFilterTextChange={this.handleFilterTextChange} />
+			<PokeList array = {pokeData} filterText = {this.state.filterText}/>
+			<Button24More />
+		</div>
+		)
+	}		 
+}
+
+function renderReact(){
+	ReactDOM.render(
+		<App />,
+		document.getElementById('container')
+	)
+}
+
+(function() {
+
+let pokeChosen = window.location.toString().split('?')[1]
+
+if (pokeChosen) {
+	currentPoke = pokeChosen - 1; // currentPoke es una unidad menor pues getPokeData incrementa 1 al principio.
+	finalPoke = pokeChosen; // finalPoke es igual a currentPoke para forzar el render y acabar el proceso.
+	batchRender = 1; // Indica que es una [sola] ficha que se ampliará.
+}
+
+getPokeData(currentPoke);
+
+})();
+
+</script>
+</body>
+</html>
+
+
